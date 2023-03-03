@@ -1,0 +1,2 @@
+# Enable almost all the extra stuff
+enable=avoid-nullary-conditions,check-set-e-suppresed,check-unassigned-uppercase,deprecate-which,quote-safe-variables,require-double-brackets,require-variable-braces,check-extra-masked-returns
