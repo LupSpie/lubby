@@ -1,40 +1,43 @@
-# Lubby
-🐧 Another Linux fetcher.
-
 <div align="center">
-    <br />
-    <img alt="Screencap of a terminal window running Lubby" src="screenshot.png">
+    <hr />
+    <h3 align="center"><img src="images/logo.svg" alt="logo" height="150px"></h3>
+    <p>Another system information fetch script written in BASH</p>
+    <hr />
 </div>
-<br />
+
+<img align="right" height="230px" alt="Screencap of a terminal window running Lubby" src="images/screenshot.png">
 
 I was bored and decided to make my own fetch just for fun. This probably breaks / doesn't work on most people's computers, but it runs fine on mine, which is what matters.
 
-## Dependencies
+While Lubby does provide useful information, such as RAM consumption and disk usage, you should generally take these as *gross* estimates. For more accurate system statistics and diagnostics, consider using a proper system diagnostic tool.
 
-### Required
-- `bash 5`
-- `xprop`
-- `df`
-### Recommended
-- `Nerd Fonts`
+<br />
 
 ## Installing
 
-Download the `lubby` script to your `$PATH` and mark it as executable (`chmod +x lubby`)
+Downloading
+```sh
+git clone https://github.com/LupSpie/lubby; cd "${_##*/}"
+```
 
-## Todo
+Copying to `$PATH` *(optional)*
+```sh
+cp lubby $HOME/.local/bin
+```
 
-- [ ] Add terminal flags
-- [ ] Add proper debugging support
+## Using
 
-## Inspiration
+Just call the script's name.
+```sh
+./lubby # If just downloading
+lubby   # If copied to your $PATH
+```
 
-| |
-| :------------ | 
-| [Grabby v2][insp_grabby] *(now deleted)* |
-| [nitch][insp_nitch] |
-| [hyfetch][insp_hyfetch] |
-| [fet.sh][insp_fet.sh] |
+### Inspirations
+- [Grabby v2][insp_grabby] *(now deleted)*
+- [nitch][insp_nitch]
+- [hyfetch][insp_hyfetch]
+- [fet.sh][insp_fet.sh]
 
 <!-- Inspirations -->
 [insp_grabby]: https://github.com/sannfdev/grabby
