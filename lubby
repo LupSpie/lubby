@@ -319,7 +319,7 @@ title="${LUB_CUSTOM_TITLE:-${user}@${host}}"
 LUB_BOX_WIDTH="${LUB_BOX_WIDTH:-${title_width}}"
 
 # Set the regex pattern for locating drives (default is "/sda*"")
-# and the width of the bar (default is 30)
+# and the width of the bar (default is 25)
 disk_regex="${LUB_DISK_REGEX:-"/sda*"}"
 disk_bar_width="${LUB_DISK_BAR_WIDTH:-25}"
 
