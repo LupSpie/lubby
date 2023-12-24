@@ -4,7 +4,7 @@
     <hr />
 </div>
 
-<img align="right" height="230px" alt="Screencap of a terminal window running Lubby" src="images/screenshot_v2.png">
+<img align="right" height="240px" alt="Screencap of a terminal window running Lubby" src="images/screenshot_v2.png">
 
 ## What is it?
 
