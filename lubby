@@ -1,280 +1,266 @@
 #!/usr/bin/env bash
 
-# Remove when debugging
-exec 2>/dev/null
-
-# 'Lubby r1' by Lupspie
+# 'Lubby v0.2' by Lupspie
 # Inspired by:
 #   'grabby v2' by sannfdev (https://github.com/sannfdev/grabby)
 #   'nitch' by ssleert (https://github.com/ssleert/nitch)
 #   'pfetch' by dylanaraps (https://github.com/dylanaraps/pfetch)
 #   'hyfetch' by hykilpikonna (https://github.com/hykilpikonna/hyfetch)
 #   'fet.sh' by 6gk (https://github.com/6gk/fet.sh)
+#   'sysfetch' by wick3dr0se (https://github.com/wick3dr0se/sysfetch)
+
+# Better error handling
+# https://disconnected.systems/blog/another-bash-strict-mode/
+set -uo pipefail
+trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
+IFS=$'\n\t'
 
 LANG=en_US.UTF-8
 
 # Labels
-readonly label_distro=' distro'          # Default: ' distro'
-readonly label_shell=' shell'            # Default: ' shell'
-readonly label_wm_de=' wm/de'            # Default: ' wm/de'
-readonly label_uptime=' uptime'          # Default: ' uptime'
-readonly label_resolution=' resolution'  # Default: ' resolution'
-readonly label_cpu=' cpu'                # Default: ' cpu'
-readonly label_host=' host'              # Default: ' host'
-readonly label_ram=' memory'             # Default: ' memory'
-readonly label_disk=' disk quota'        # Default: ' disk quota'
-
+readonly LABEL_DISTRO=' distro'          # Default: ' distro'
+readonly LABEL_SHELL=' shell'            # Default: ' shell'
+readonly LABEL_WM_DE=' wm/de'            # Default: ' wm/de'
+readonly LABEL_UPTIME=' uptime'          # Default: ' uptime'
+readonly LABEL_RESOLUTION=' resolution'  # Default: ' resolution'
+readonly LABEL_CPU=' cpu'                # Default: ' cpu'
+readonly LABEL_BOARD=' board'            # Default: ' board'
+readonly LABEL_MEMORY=' memory'          # Default: ' memory'
+readonly LABEL_DISK=' disk quota'        # Default: ' disk quota'
 # Icons
-readonly icon_disk_filled='#' # Default: '#'
-readonly icon_disk_total='.'  # Default: '.'
-readonly icon_arrow=''       # Default: ''
-
+readonly SYMBOL_DISK_FILLED='#'           # Default: '#'
+readonly SYMBOL_DISK_REMAINDER='.'        # Default: '.'
+readonly SYMBOL_SEPARATOR=''                 # Default: ''
 # Colors ~ https://gist.github.com/iamnewton/8754917
-readonly color_base='\033[1;37m'              # Default: '\033[1;37m'
-readonly color_accent_primary='\033[1;34m'    # Default: '\033[1;34m'
-readonly color_accent_secondary='\033[1;33m'  # Default: '\033[1;33m'
-
+readonly COLOR_RESET='\033[m'             # Default: '\033[m'
+readonly COLOR_BASE='\033[1;37m'          # Default: '\033[1;37m'
+readonly COLOR_PRIMARY='\033[1;34m'       # Default: '\033[1;34m'
+readonly COLOR_SECONDARY='\033[1;33m'     # Default: '\033[1;33m'
 # Box
-readonly box_upper_left='\xe2\x95\xad'    # Default: '\xe2\x95\xad'
-readonly box_upper_right='\xe2\x95\xae'   # Default: '\xe2\x95\xae'
-readonly box_bottom_left='\xe2\x95\xb0'   # Default: '\xe2\x95\xb0'
-readonly box_bottom_right='\xe2\x95\xaf'  # Default: '\xe2\x95\xaf'
-readonly box_divider_left='\xe2\x94\x9c'  # Default: '\xe2\x94\x9c'
-readonly box_divider_right='\xe2\x94\xa4' # Default: '\xe2\x94\xa4'
-readonly box_horizontal='\xe2\x94\x80'    # Default: '\xe2\x94\x80'
-readonly box_vertical='\xe2\x94\x82'      # Default: '\xe2\x94\x82'
+readonly BOX_UPPER_LEFT='\xe2\x95\xad'    # Default: '\xe2\x95\xad'
+readonly BOX_UPPER_RIGHT='\xe2\x95\xae'   # Default: '\xe2\x95\xae'
+readonly BOX_BOTTOM_LEFT='\xe2\x95\xb0'   # Default: '\xe2\x95\xb0'
+readonly BOX_BOTTOM_RIGHT='\xe2\x95\xaf'  # Default: '\xe2\x95\xaf'
+readonly BOX_DIVIDER_LEFT='\xe2\x94\x9c'  # Default: '\xe2\x94\x9c'
+readonly BOX_DIVIDER_RIGHT='\xe2\x94\xa4' # Default: '\xe2\x94\xa4'
+readonly BOX_HORIZONTAL='\xe2\x94\x80'    # Default: '\xe2\x94\x80'
+readonly BOX_VERTICAL='\xe2\x94\x82'      # Default: '\xe2\x94\x82'
 
-# Overrides ~ Leave empty for default values
-custom_title='' # Use a custom box header title (if left empty, user@host will be used instead)
-box_width='' # Forces a specific width. (if left empty, the length of the title will be used as width)
-disk_bar_width='30' # Controls the disk bar's width.
-disk_regex='^/dev' # Controls the regex used to fetch the disks to display.
-hide_user='false' # True = Hides your username
-hide_host='false' # True = Hides your hostname
+box__draw_top() {
+  local title fill
+  title="${1::${LUB_BOX_WIDTH}}"
 
-######### ! CONFIG STUFF ENDED ! #########
-######### ! CONFIG STUFF ENDED ! #########
+  # Add the left margin and header text
+  printf -- '%b%s' "${COLOR_BASE}${BOX_UPPER_LEFT}${BOX_HORIZONTAL}" "${title}"
 
-# Box Stuff
-box__draw_header() {
-  local header_text header_fill
-  header_text="${1::${box_width}}"
+  # Fill space to make it the same width as the $LUB_BOX_WIDTH
+  (( fill = LUB_BOX_WIDTH - ${#title} ))
+  printf -v fill "%${fill}s" ''
+  printf -- '%b' "${fill// /${BOX_HORIZONTAL}}"
 
-  # Add the left margin and header label
-  printf -- "%${box_margin}s" ''
-  printf -- '%b%s' "${BASE}${box_upper_left}${box_horizontal}" "${header_text}"
-
-  # Fill space to make it the same width as the $box_width
-  (( header_fill = box_width - ${#header_text} + 1 ))
-  printf -v header_fill "%${header_fill}s" ''
-  printf -- '%b' "${header_fill// /${box_horizontal}}"
-
-  # Reset the color
-  printf -- '%b\n' "${box_upper_right}${RESET}"
+  # Add both the right horizontal symbol and the corner piece + reset the color
+  printf -- '%b\n' "${BOX_HORIZONTAL}${BOX_UPPER_RIGHT}${COLOR_RESET}"
 }
+
 box__draw_row() {
-  local row_label row_description row_fill
-  row_label="${1::${box_width}}"; shift
-  row_description="$*"
+  local label content fill
+  label="${1::${LUB_BOX_WIDTH}}"; shift
+  content="$*"
 
-  # Print the label for the current row (goes inside of the box)
-  printf -- "%${box_margin}s" ''
-  printf -- '%b %s' "${BASE}${box_vertical}${RESET}" "${row_label}"
+  # Add the left margin and header text
+  printf -- '%b %s ' "${COLOR_BASE}${BOX_VERTICAL}${COLOR_RESET}" "${label}"
 
-  # Adds $box_width number of spaces + 1 to align everything
-  # also needs to add 1 because of the space we added before.
-  (( row_fill = box_width - ${#row_label} + 1 ))
-  printf -- "%${row_fill}s" ''
+  (( fill = LUB_BOX_WIDTH - ${#label} ))
+  printf -- "%${fill}s" ''
 
-  # Print the description for the current row (goes outside of the box)
-  printf -- '%b %b\n' "${BASE}${box_vertical}${RESET}" "${row_description}"
+  printf -- '%b %b\n' "${COLOR_BASE}${BOX_VERTICAL}${COLOR_RESET}" "${content}${COLOR_RESET}"
 }
-box__draw_change() {
-  local change_fill
+
+box__draw_span() {
+  local left right fill
+  left="$1" right="$2"
 
   # Add the left margin and print the left side of the box
-  printf -- "%${box_margin}s" ''
-  printf -- '%b' "${BASE}${box_divider_left}${box_horizontal}"
+  printf -- '%b' "${COLOR_BASE}${left}${BOX_HORIZONTAL}"
 
   # Add the spaces then replace them with the $box_horizontal
-  printf -v change_fill "%${box_width}s" ''
-  printf -- '%b' "${change_fill// /${box_horizontal}}"
+  printf -v fill "%${LUB_BOX_WIDTH}s" ''
+  printf -- '%b' "${fill// /${BOX_HORIZONTAL}}"
 
   # Print the right side of the box
-  printf -- '%b\n' "${box_horizontal}${box_divider_right}${RESET}"
-}
-box__draw_bottom() {
-  local bottom_fill
-
-  # Add the left margin and print the left side of the box
-  printf -- "%${box_margin}s" ''
-  printf -- '%b' "${BASE}${box_bottom_left}${box_horizontal}"
-
-  # Add the spaces then replace them with the $box_horizontal
-  printf -v bottom_fill "%${box_width}s" ''
-  printf -- '%b' "${bottom_fill// /${box_horizontal}}"
-
-  # Print the right side of the box
-  printf -- '%b\n' "${box_horizontal}${box_bottom_right}${RESET}"
+  printf -- '%b\n' "${BOX_HORIZONTAL}${right}${COLOR_RESET}"
 }
 
-# Fetch Stuff
-get_title() {
-  local user host
-  user="${USER:-$(id -un)}"
-  host="${HOSTNAME:-${hostname:-$(hostname 2>/dev/null)}}"
-
-  # If the user decides to hide his username from diplaying, unset usr
-  [[ "${hide_user}" = 'true' ]] && unset user
-  # If the user decides to hide his hostname from diplaying, unset hst
-  [[ "${hide_host}" = 'true' ]] && unset host
-
-  # Use custom title if set.
-  if [[ -z "${custom_title}" ]]; then
-    title_text="${user}${host:+@${host}}"
-    title_text="${title_text#@}"
-  else
-    title_text="${custom_title}"
-  fi
-
-  # The width is used to set the box_width (if the user isn't overriding it),
-  # so it's easier to separate it into two different variables.
-  (( title_width = ${#title_text} + 2 ))
-  (( ${#title_text} < 12 )) && title_width="12"
-}
-get_distro() {
+#
+# Grabs the distribution name from the /etc/os-release file.
+# Sets the distro_name variable.
+#
+grab_distro() {
   local distro
 
-  while IFS='=' read -r field_name field_value _; do
-    case "${field_name}" in
-      ('PRETTY_NAME')
-        distro="${field_value}"
-        break
+  while IFS='=' read -r name value _; do
+    case "${name}" in
+      ('PRETTY'*)
+        : "${name//\'}"
+        : "${value//\"}"
+        distro="${_}"; break
       ;;
     esac
   done < /etc/os-release
 
-  # Strip the quotes from the distro name
-  distro=${distro##[\"\']}
-  distro=${distro%%[\"\']}
-
-  fetched_distro="${distro}"
+  distro_name="${distro}"
 }
-get_kernel() {
-  local kernel_full
-  IFS='-' read -r kernel_full _ < /proc/sys/kernel/osrelease
+#
+# Grabs the kernel version from /proc/sys/kernel/osrelease.
+# Sets the kernel_version variable.
+#
+grab_kernel() {
+  local version
 
-  fetched_kernel="${kernel_full}"
+  # Read everything before the '-' from osrelease
+  IFS='-' read -r version _ < /proc/sys/kernel/osrelease
+
+  kernel_version="${version}"
 }
-get_shell() {
-  local shell
-
-  shell="${SHELL##*/} ${BASE}(${ACC_BG}${SHELL}${BASE})"
-  # Get shell name by doing removing the long prefix from $SHELL
-  fetched_shell="${shell}"
+#
+# Grabs the shell name and path.
+# Sets the shell_name and shell_path variables.
+#
+grab_shell() {
+  shell_name="${SHELL##*/}"
+  shell_path="${SHELL}"
 }
-get_wm() {
-  # NOTE: Current implementation depends on xprop. Would be nicer if there was
-  # a way of getting the WM without external dependencies
-  local window_id wm_name display_server
+#
+# Grabs information about the graphical environment, including the
+# window manager, desktop environment, and display server.
+# Sets the graphical_wm, graphical_de, and graphical_server variables.
+#
+grab_graphical() {
+  # TODO: Find a reliable way without using xprop
+  local wm_name de_name display_server
 
-  # Get the window ID
-  window_id="$(xprop -notype -root '_NET_SUPPORTING_WM_CHECK')"
-  window_id="${window_id##* }"
-  # Get the WM name
-  wm_name="$(xprop -id "${window_id}" -notype '_NET_WM_NAME')"
-  wm_name="${wm_name//\"}"
-  wm_name="${wm_name##* }"
-  # Get the display server badge
+  # Grab the WM name
+  # - Get the window ID
+  : "$(xprop -notype -root '_NET_SUPPORTING_WM_CHECK' || true)"
+  : "${_##* }"
+  # - Get the WM name
+  : "$(xprop -id "${_}" -notype '_NET_WM_NAME' || true)"
+  : "${_//\"}"
+  wm_name="${_##* }"
+
+  # Grab the DE/Session name
+  : "${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION}}"
+  de_name="${_/KDE/Plasma}"
+
+  # Grab the display server name
   display_server="${XDG_SESSION_TYPE:-other}"
 
-  fetched_wm="${wm_name} ${BASE}(${ACC_BG}${display_server}${BASE})"
+  graphical_wm="${wm_name}"
+  graphical_de="${de_name}"
+  graphical_server="${display_server}"
 }
-get_de() {
-  fetched_de="${XDG_CURRENT_DESKTOP:-${DESKTOP_SESSION}}"
-  fetched_de="${fetched_de/KDE/Plasma}"
-}
-get_uptime() {
-  local days hours minutes secs total_uptime
+#
+# Grabs system uptime and formats it as days, hours, and minutes.
+# Sets the uptime_total variable.
+#
+grab_uptime() {
+  local secs minutes hours days
 
   IFS=. read -r secs _ < /proc/uptime
   (( days    = secs / 60 / 60 / 24 ))
   (( hours   = secs / 60 / 60 % 24 ))
   (( minutes = secs / 60 % 60 ))
 
-  # The only downside(?) of this approach is that if everything is set to 0, the
-  # minutes will appear. Personaly, I don't really consider this to be a negative.
-  total_uptime="${days} days, ${hours} hours, ${minutes} minutes"
-  total_uptime="${total_uptime#0*, }"  # Remove days if it's 0
-  total_uptime="${total_uptime/0*, }"  # Remove hours if it's 0
-  total_uptime="${total_uptime/, 0*/}" # Remove minutes if it's 0
+  # NOTE: When a user first boots up their computer, minutes will be set to 0
+  # this can technically be considered a bug, but I'm not bothered by it.
+  : "${days} days, ${hours} hours, ${minutes} minutes"
+  : "${_#0*, }"  # Remove days if equal to 0
+  : "${_/0*, }"  # Remove hours if equal to 0
+  total_uptime="${_/, 0*/}" # Remove minutes if equal to 0
 
-  # Remove plural if = 1.
-  (( days    == 1 )) && total_uptime="${total_uptime/days/day}"
-  (( hours   == 1 )) && total_uptime="${total_uptime/hours/hour}"
-  (( minutes == 1 )) && total_uptime="${total_uptime/minutes/minute}"
+  # Remove plurals if equals to 1.
+  (( days    == 1 )) && total_uptime="${total_uptime/"days"/"day"}"
+  (( hours   == 1 )) && total_uptime="${total_uptime/"hours"/"hour"}"
+  (( minutes == 1 )) && total_uptime="${total_uptime/"minutes"/"minute"}"
 
-  fetched_uptime="${total_uptime//,/${BASE},${ACC_FG}}"
+  uptime_total="${total_uptime}"
 }
-get_resolution() {
-  local resolution
-  # Thanks again hyfetch
-  # https://github.com/hykilpikonna/hyfetch/blob/master/neofetch#L3718
+#
+# Grabs display resolutions from /sys/class/drm/*/modes.
+# Sets the resolution_all variable.
+#
+grab_resolution() {
+  local resolution sys_resolution
+  # Huge thanks to hyfetch <3
+  # https://github.com/hykilpikonna/hyfetch/blob/master/neofetch
   for dev in /sys/class/drm/*/modes; do
     IFS= read -r sys_resolution _ < "${dev}"
-    [[ -n "${sys_resolution}" ]] && resolution="${sys_resolution}, ${resolution}"
+    [[ -z "${sys_resolution}" ]] && continue
+
+    resolution="${sys_resolution}, ${resolution:-}"
   done
 
-  resolution="${resolution%%', '}"
-  resolution="${resolution//x/${BASE}x${ACC_FG}}"
-  fetched_resolution="${resolution:-null}"
+  resolution_all="${resolution%%', '}"
 }
-get_cpu() {
-  local cpu_full cpu_model cpu_clock
+#
+# Grabs CPU information including the model and maximum frequency.
+# Sets the cpu_model and cpu_freq variables.
+#
+grab_cpu() {
+  local cpu_full freq_khz name val
   # Get the CPU by reading from /proc/cpuinfo
-  while IFS=: read -r field_name field_value _; do
-    case "${field_name}" in
+  while IFS=: read -r name val _; do
+    case "${name}" in
       "model name"*)
-        cpu_full="${field_value/ /}"
+        cpu_full="${val#* }"
         break
       ;;
     esac
   done < /proc/cpuinfo
 
-  cpu_model="${cpu_full%% @*}"
-  cpu_clock="${cpu_full##*@ }"
+  # Format the CPU name
+  : "${cpu_full%% @*}"
+  # : "${_##*) }"
+  : "${_//\([rR]\)/}"
+  : "${_%% CPU}"
+  : "${_##CPU }"
+  : "${_%% with*}"
+  cpu_model="${_}"
 
-#   cpu_model=${cpu_model##*) }
-  cpu_model=${cpu_model//\([rR]\)/}
-  cpu_model=${cpu_model%% CPU}
-  cpu_model=${cpu_model##CPU }
-  cpu_model=${cpu_model%% with*}
-
-  fetched_cpu="${cpu_model} ${BASE}@ ${ACC_BG}${cpu_clock}"
+  # Format the CPU Max freq
+  : '/sys/devices/system/cpu/cpu0/cpufreq'
+  read -r freq_khz < "${_}/scaling_max_freq"
+  # Bash doesn't do floating point math, so we'll use bc instead.
+  read -r maxFreq < <(bc -l <<< "scale=2; ${freq_khz}/1000000")
+  
+  cpu_freq="${maxFreq}"
 }
-get_host() {
+#
+# Grabs the model name of the system board.
+# Sets the device_board variable.
+#
+grab_board() {
   local model_name
-  IFS= read -r model_name _ < /sys/devices/virtual/dmi/id/product_name
+  read -r model_name < /sys/devices/virtual/dmi/id/board_name
+  
+  : "${model_name//(/${COLOR_BASE}(${COLOR_SECONDARY}}"
+  : "${_//)/${COLOR_BASE})${COLOR_RESET}}"
 
-  case "${model_name}" in
-    # alternate file with slightly different info
-	'System '*|'Default '*|'To Be Filled'*)
-      IFS= read -r model_name < /sys/devices/virtual/dmi/id/board_name
-  esac
-
-  fetched_host="${model_name}"
+  device_board="${_}"
 }
-get_memory() {
-  local mem_total mem_used mem_percent
-
-  # Assume that the the host is running with a kernel version newer than 3.14
-  while IFS=':k ' read -r field_name field_value _; do
-    case "${field_name}" in
+#
+# Grabs memory information, including total, available, used, and percentage used.
+# Sets the mem_total, mem_avail, mem_used, and mem_percent variables.
+# 
+grab_memory() {
+  # We're assuming that the the host is running with kernel 3.14+
+  while IFS=':k ' read -r name val _; do
+    case "${name}" in
       ("MemTotal")
-        mem_total="${field_value}"
+        mem_total="${val}"
       ;;
       ("MemAvailable")
-        mem_avail="${field_value}"
+        mem_avail="${val}"
       ;;
     esac
   done < /proc/meminfo
@@ -283,94 +269,85 @@ get_memory() {
   (( mem_total = mem_total / 1024 ))
   (( mem_percent = mem_used * 100 / mem_total ))
 
-  mem_used="${mem_used:-null}"
-  mem_total="${mem_total:-null}"
-  mem_percent="${mem_percent:-null}"
-
-  fetched_memory="${mem_used}${BASE}/${ACC_FG}${mem_total} MiB ${BASE}(${ACC_BG}${mem_percent}%${BASE})"
+  mem_used="${mem_used:-'null'}"
+  mem_total="${mem_total:-'null'}"
+  mem_percent="${mem_percent:-'null'}"
 }
-display_disks() {
-  local bar_length bar_progress bar_total bar_output disk_fetch_regex
-  bar_length="${disk_bar_width}"
-  disk_fetch_regex="${disk_regex}"
+#
+# Grabs disk information and calculates progress bar values.
+# Takes a disk line from the 'df' command as an argument.
+# Sets variables related to disk information.
+#
+grab_disk() {
+    local df_disk_line
+    df_disk_line="${1}"
 
-  # Create a progress bar.
-  # shellcheck disable=SC2312
-  while IFS=' ' read -r _ disk_type _ _ _ disk_perc disk_mount _; do
-    [[ "${disk_type}" = "Type" ]] && continue
+    IFS=' ' read -r _ disk_type _ _ _ disk_perc disk_mount _ <<< "${df_disk_line}"
+    
+    [[ "${disk_type}" = "Type" ]] && return 1
 
-    # Remove the '%' symbol and add the leading zero.
+    # Remove the '%' symbol.
     printf -v disk_perc '%02d' "${disk_perc%\%*}"
 
-    # https://github.com/dylanaraps/pure-bash-bible#progress-bars
-    (( disk_filled = disk_perc * bar_length / 100 + 1 ))
-    (( disk_total = bar_length - disk_filled ))
+    # Calculate progress bar values
+    read -r disk_filled < <(bc -l <<< "scale=2; (${disk_perc} * ${disk_bar_width}) / 100 + 1")
+    read -r disk_total < <(bc -l <<< "scale=2; ${disk_bar_width} - ${disk_filled}")
+
+    # Create progress bar strings
     printf -v bar_progress "%${disk_filled}s" ''
     printf -v bar_total "%${disk_total}s" ''
 
-    bar_output="${ACC_FG}${bar_progress// /${icon_disk_filled}}"
-    bar_output="${bar_output}${RESET}${bar_total// /${icon_disk_total}}"
-
-    box__draw_row "  ${disk_mount}" "${COLORED_ARROW}" "${BASE}[${bar_output}${BASE}] (${ACC_BG}${disk_perc}%${BASE}) ${ACC_FG}${disk_type}${RESET}"
-  done < <(grep -iE "${disk_fetch_regex}" <(LC_ALL=C df -PTh))
+    # Create formatted output
+    bar_filled="${bar_progress// /${SYMBOL_DISK_FILLED}}"
+    bar_remainder="${bar_output:-}${bar_total// /${SYMBOL_DISK_REMAINDER}}"
 }
 
-is_int()  {
-  # Positive Integer check ~ https://stackoverflow.com/a/61835747
-  case "${1}" in
-    *[!0-9]* )
-      printf -- '%b %s\n' "\033[0m\033[1;41m[ERR]\e[0m" "${*} is not a positive integer" >&2
-      exit 1;
-    ;;
-  esac
-}
+# Define the username and the hostname
+user="${USER:-$(id -un)}"
+host="${HOSTNAME:-$(hostname 2>/dev/null)}"
 
-draw() {
-  get_distro; get_kernel
-  get_shell
-  get_wm; get_de
-  get_uptime
-  get_resolution
-  get_cpu
-  get_host
-  get_memory
+# Set the title to either the custom variable, or the user@host
+# - Hide if LUB_NO_TITLE is declared
+title="${LUB_CUSTOM_TITLE:-${user}@${host}}"
+[[ -n "${LUB_NO_TITLE:-}" ]] && unset title
 
-  box__draw_header "${title_text}"
-  box__draw_row "${label_distro}" "${COLORED_ARROW}" "${ACC_FG}${fetched_distro} ${BASE}(${ACC_BG}${fetched_kernel}${BASE})${RESET}"
-  box__draw_row "${label_shell}"  "${COLORED_ARROW}" "${ACC_FG}${fetched_shell}${RESET}"
-  box__draw_row "${label_wm_de}"  "${COLORED_ARROW}" "${ACC_FG}${fetched_wm} ${BASE}+ ${ACC_FG}${fetched_de}${RESET}"
-  box__draw_row "${label_uptime}" "${COLORED_ARROW}" "${ACC_FG}${fetched_uptime}${RESET}"
-  box__draw_change
-  box__draw_row "${label_resolution}" "${COLORED_ARROW}" "${ACC_FG}${fetched_resolution}${RESET}"
-  box__draw_row "${label_cpu}" "${COLORED_ARROW}" "${ACC_FG}${fetched_cpu}${RESET}"
-  box__draw_row "${label_host}" "${COLORED_ARROW}" "${ACC_FG}${fetched_host}${RESET}"
-  box__draw_row "${label_ram}" "${COLORED_ARROW}" "${ACC_FG}${fetched_memory}${RESET}"
-  box__draw_change
-  box__draw_row "${label_disk}"; display_disks
-  box__draw_bottom
-}
-main() {
-  # Integer check
-  is_int "${box_width}" 'disk_bar_width'
-  is_int "${disk_bar_width}" 'disk_bar_width'
-  get_title # For width stuff
+# Get the size of the title and add a little bit of padding to the right (2 by default)
+# - Set a size of 12 as the minimum
+# - If LUB_BOX_WIDTH is set, use that instead of the title width
+(( title_width = ${#title} + 2 ))
+(( title_width < 12 )) && title_width=12
+LUB_BOX_WIDTH="${LUB_BOX_WIDTH:-${title_width}}"
 
-  # Colors
-  readonly RESET='\033[m'
-  readonly BASE="${RESET}${color_base}"
-  readonly ACC_FG="${RESET}${color_accent_primary}"
-  readonly ACC_BG="${RESET}${color_accent_secondary}"
-  readonly COLORED_ARROW="${ACC_BG}${icon_arrow}${RESET}"
+# Set the regex pattern for locating drives (default is "/sda*"")
+# and the width of the bar (default is 25)
+disk_regex="${LUB_DISK_REGEX:-"/sda*"}"
+disk_bar_width="${LUB_DISK_BAR_WIDTH:-25}"
 
-  # Overrides
-  box_margin='2'
-  box_width="${box_width:-${title_width}}"
-  disk_bar_width="${disk_bar_width:-'30'}"
-  disk_regex="${disk_regex:-'^/dev'}"
-  hide_username="${hide_username:-'false'}"
-  hide_hostname="${hide_hostname:-'false'}"
+# Initialize (e.g: Grab) all the variables
+grab_distro; grab_kernel; grab_shell; grab_graphical; grab_uptime; grab_resolution; grab_cpu; grab_board; grab_memory
 
-  draw
-  exit 0
-}
-main
+# Print the fetched information!
+box__draw_top  "${title}"
+
+box__draw_row  "${LABEL_DISTRO}" "${COLOR_PRIMARY}${distro_name} ${COLOR_BASE}(${COLOR_SECONDARY}${kernel_version}${COLOR_BASE})"
+box__draw_row  "${LABEL_SHELL}"  "${COLOR_PRIMARY}${shell_name} ${COLOR_BASE}(${COLOR_SECONDARY}${shell_path}${COLOR_BASE})"
+box__draw_row  "${LABEL_WM_DE}"  "${COLOR_PRIMARY}${graphical_wm} ${COLOR_BASE}(${COLOR_SECONDARY}${graphical_server}${COLOR_BASE}) + ${COLOR_PRIMARY}${graphical_de}"
+box__draw_row  "${LABEL_UPTIME}" "${COLOR_PRIMARY}${uptime_total//,/${COLOR_BASE},${COLOR_PRIMARY}}"
+
+box__draw_span "${BOX_DIVIDER_LEFT}" "${BOX_DIVIDER_RIGHT}"
+
+box__draw_row  "${LABEL_RESOLUTION}" "${COLOR_PRIMARY}${resolution_all//,/${COLOR_BASE},${COLOR_PRIMARY}}"
+box__draw_row  "${LABEL_CPU}" "${COLOR_PRIMARY}${cpu_model} ${COLOR_BASE}@ ${COLOR_SECONDARY}${cpu_freq}GHz"
+box__draw_row  "${LABEL_BOARD}" "${COLOR_PRIMARY}${device_board}"
+box__draw_row  "${LABEL_MEMORY}" "${COLOR_PRIMARY}${mem_used}${COLOR_BASE}/${COLOR_PRIMARY}${mem_total} MiB ${COLOR_BASE}(${COLOR_SECONDARY}${mem_percent}%${COLOR_BASE})"
+
+box__draw_span "${BOX_DIVIDER_LEFT}" "${BOX_DIVIDER_RIGHT}"
+
+# Process each disk line
+box__draw_row  "${LABEL_DISK}"
+while IFS= read -r line; do
+  grab_disk "$line" || continue
+  box__draw_row "  ${disk_mount}" "${COLOR_BASE}[ ${COLOR_PRIMARY}${bar_filled}${COLOR_BASE}${bar_remainder} (${COLOR_SECONDARY}${disk_perc}%${COLOR_BASE}) ] ${COLOR_PRIMARY}${disk_type}"
+done < <(grep -iE "${disk_regex}" <(LC_ALL=C df -PTh))
+
+box__draw_span "${BOX_BOTTOM_LEFT}" "${BOX_BOTTOM_RIGHT}"
