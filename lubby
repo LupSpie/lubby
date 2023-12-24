@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -o pipefail
 
 # 'Lubby v0.2' by Lupspie
 # Inspired by:
@@ -9,6 +8,12 @@ set -o pipefail
 #   'hyfetch' by hykilpikonna (https://github.com/hykilpikonna/hyfetch)
 #   'fet.sh' by 6gk (https://github.com/6gk/fet.sh)
 #   'sysfetch' by wick3dr0se (https://github.com/wick3dr0se/sysfetch)
+
+# Better error handling
+# https://disconnected.systems/blog/another-bash-strict-mode/
+set -uo pipefail
+trap 's=$?; echo "$0: Error on line "$LINENO": $BASH_COMMAND"; exit $s' ERR
+IFS=$'\n\t'
 
 LANG=en_US.UTF-8
 
@@ -192,7 +197,7 @@ grab_resolution() {
     IFS= read -r sys_resolution _ < "${dev}"
     [[ -z "${sys_resolution}" ]] && continue
 
-    resolution="${sys_resolution}, ${resolution}"
+    resolution="${sys_resolution}, ${resolution:-}"
   done
 
   resolution_all="${resolution%%', '}"
@@ -294,7 +299,7 @@ grab_disk() {
 
     # Create formatted output
     bar_filled="${bar_progress// /${SYMBOL_DISK_FILLED}}"
-    bar_remainder="${bar_output}${bar_total// /${SYMBOL_DISK_REMAINDER}}"
+    bar_remainder="${bar_output:-}${bar_total// /${SYMBOL_DISK_REMAINDER}}"
 }
 
 # Define the username and the hostname
@@ -304,7 +309,7 @@ host="${HOSTNAME:-$(hostname 2>/dev/null)}"
 # Set the title to either the custom variable, or the user@host
 # - Hide if LUB_NO_TITLE is declared
 title="${LUB_CUSTOM_TITLE:-${user}@${host}}"
-[[ -n "${LUB_NO_TITLE}" ]] && unset title
+[[ -n "${LUB_NO_TITLE:-}" ]] && unset title
 
 # Get the size of the title and add a little bit of padding to the right (2 by default)
 # - Set a size of 12 as the minimum
