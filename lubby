@@ -278,14 +278,15 @@ grab_disk() {
     df_disk_line="${1}"
 
     IFS=' ' read -r _ disk_type _ _ _ disk_perc disk_mount _ <<< "${df_disk_line}"
-    [[ "${disk_type}" = "Type" ]] && return
+    
+    [[ "${disk_type}" = "Type" ]] && return 1
 
-    # Remove the '%' symbol and add the leading zero.
-    disk_perc="${disk_perc%\%*}"
+    # Remove the '%' symbol.
+    printf -v disk_perc '%02d' "${disk_perc%\%*}"
 
     # Calculate progress bar values
-    read -r disk_filled < <(bc -l <<< "scale=1; (${disk_perc} * ${disk_bar_width}) / 100 + 1")
-    read -r disk_total < <(bc -l <<< "scale=1; ${disk_bar_width} - ${disk_filled}")
+    read -r disk_filled < <(bc -l <<< "scale=2; (${disk_perc} * ${disk_bar_width}) / 100 + 1")
+    read -r disk_total < <(bc -l <<< "scale=2; ${disk_bar_width} - ${disk_filled}")
 
     # Create progress bar strings
     printf -v bar_progress "%${disk_filled}s" ''
@@ -340,7 +341,7 @@ box__draw_span "${BOX_DIVIDER_LEFT}" "${BOX_DIVIDER_RIGHT}"
 # Process each disk line
 box__draw_row  "${LABEL_DISK}"
 while IFS= read -r line; do
-  grab_disk "$line"
+  grab_disk "$line" || continue
   box__draw_row "  ${disk_mount}" "${COLOR_BASE}[ ${COLOR_PRIMARY}${bar_filled}${COLOR_BASE}${bar_remainder} (${COLOR_SECONDARY}${disk_perc}%${COLOR_BASE}) ] ${COLOR_PRIMARY}${disk_type}"
 done < <(grep -iE "${disk_regex}" <(LC_ALL=C df -PTh))
 
